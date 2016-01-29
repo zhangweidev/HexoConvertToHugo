@@ -85,7 +85,6 @@ def convert_file(file_path,out_dir,file_temp=None):
         print m_head['tags']
 
     m_categories = front_data.get('categories',None)
-
     if m_categories:
         m_head['categories']=[]
         if isinstance(m_categories,list):
