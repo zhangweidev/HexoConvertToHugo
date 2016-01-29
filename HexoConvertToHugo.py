@@ -4,25 +4,102 @@
 import os
 import re
 import yaml
+import pytoml as toml
 from datetime import datetime
 import argparse
+import sys
+
 
 __author__ = 'zhangwei'
 
 
 
+reload(sys)                      # reload 才能调用 setdefaultencoding 方法  
+sys.setdefaultencoding('utf-8')  # 设置 'utf-8'  
+
+
 content_regex = re.compile(r'([\s\S]*?)---*([\s\S]*)')
+temp_regex = re.compile(r'\+\+\+*([\s\S]*?)\+\+\+*([\s\S]*)')
+
 
 
 def write_out_file(front_data, body_text, out_file_path):
-    out_lines = ['---']
-    front_string = yaml.dump(front_data, width=1000, default_flow_style=False, allow_unicode=True)
+    out_lines = ['+++']
+    front_string = toml.dumps(front_data)
     out_lines.extend(front_string.splitlines())
-    out_lines.append('---')
+    out_lines.append('+++')
     out_lines.extend(body_text.splitlines())
 
     with open(out_file_path, 'w') as f:
+
         f.write('\n'.join(out_lines))
+
+def convert_file(file_path,out_dir,file_temp=None):
+    """
+    file_path  需要转换的文件
+    out_dir  文件输出目录 
+    file_temp  输出模板 
+    """
+    filename = os.path.basename(file_path)#.replace('.','_') # 似乎标题有.会有些问题 
+
+    temp_content =''
+    m_head={}
+    if file_temp:
+        with open(file_temp,'r') as f:
+            temp_content = f.read()
+        m_temp = temp_regex.match(temp_content)
+        m_head = toml.loads(m_temp.group(1))
+
+
+    content = ''
+    with open(file_path,'r') as f :
+        content = f.read()
+
+    m = content_regex.match(content)
+    if not m:
+        print 'Error match content: %s' % file_path
+        return False
+
+    front_data = yaml.load(m.group(1))
+    if not front_data:
+        print 'Error load yaml: %s' % file_path
+        return False
+
+    m_head['title']= front_data.get('title','')
+
+    if front_data.get("description",None):
+        m_head['description']=front_data.get("description",None)
+
+    if front_data.get('date',None):
+        #time.strftime("%Y-%m-%dT%H:%M:%S+08:00",b)
+        m_head['date']=front_data.get('date',None).strftime('%Y-%m-%dT%H:%M:%S+08:00')
+
+    m_tags = front_data.get('tags',None)
+    if m_tags:
+        print type(m_tags),m_tags
+        m_head['tags']=[]
+        if isinstance(m_tags,list):
+            m_head['tags'].extend(m_tags)
+        else:
+            m_head['tags'].append(m_tags)
+        print m_head['tags']
+
+    m_categories = front_data.get('categories',None)
+
+    if m_categories:
+        m_head['categories']=[]
+        if isinstance(m_categories,list):
+            m_head['categories'].extend(m_categories)
+        else:
+            m_head['categories'].append(m_categories)
+        print m_head['categories']
+    
+    write_out_file(m_head,m.group(2),out_dir+'/'+filename)
+
+    return True 
+
+
+
 
 
 def convert_post(file_path, out_dir):
@@ -42,6 +119,8 @@ def convert_post(file_path, out_dir):
     if not front_data:
         print 'Error load yaml: %s' % file_path
         return False
+
+
 
     #print front_data  
 
@@ -82,7 +161,7 @@ def convert_post(file_path, out_dir):
     return True
 
 
-def convert(src_dir, out_dir):
+def convert(src_dir, out_dir,file_temp=None):
     count = 0
     error = 0
     for root, dirs, files in os.walk(src_dir):
@@ -96,7 +175,7 @@ def convert(src_dir, out_dir):
                     os.path.dirname(file_path), common_prefix)
                 real_out_dir = os.path.join(out_dir, rel_path)
                 print file_path, real_out_dir
-                if convert_post(file_path, real_out_dir):
+                if convert_file(file_path, real_out_dir,file_temp):
                     print 'Converted: %s' % file_path
                     count += 1
                 else:
@@ -109,10 +188,14 @@ def convert(src_dir, out_dir):
 
 
 if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser(description='Convert Hexo blog to GoHugo')
+    parser = argparse.ArgumentParser(description='Convert Hexo blog to Hugo')
     parser.add_argument('src_dir', help='hexo _posts dir')
     parser.add_argument('out_dir', help='hugo root path')
+    parser.add_argument('file_temp', help='hugo theme default templete')
+
     args = parser.parse_args()
 
-    convert(os.path.abspath(args.src_dir), os.path.abspath(args.out_dir))
+    convert(os.path.abspath(args.src_dir),
+        os.path.abspath(args.out_dir),
+        os.path.abspath(args.file_temp))
+
