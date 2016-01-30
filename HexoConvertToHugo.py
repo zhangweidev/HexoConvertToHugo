@@ -193,6 +193,8 @@ if __name__ == '__main__':
     parser.add_argument('file_temp', help='hugo theme default templete')
 
     args = parser.parse_args()
+    print os.path.abspath(args.src_dir)
+    
 
     convert(os.path.abspath(args.src_dir),
         os.path.abspath(args.out_dir),
